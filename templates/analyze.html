@@ -658,45 +658,64 @@
         }
 
         function updateSummaryCards() {
-            // Mock summary data based on analysis
-            const analysisContent = document.querySelector('.section-content').textContent.toLowerCase();
-            
-            // Count keywords to estimate severity
-            const criticalKeywords = ['critical', 'severe', 'high risk', 'vulnerable', 'exposed'];
-            const warningKeywords = ['warning', 'medium', 'concern', 'review', 'attention'];
-            
-            let criticalCount = 0;
-            let warningCount = 0;
-            
-            criticalKeywords.forEach(keyword => {
-                const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
-                criticalCount += matches;
-            });
-            
-            warningKeywords.forEach(keyword => {
-                const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
-                warningCount += matches;
-            });
+            // Use real data from backend if available
+            {% if risk_analysis %}
+                document.getElementById('critical-count').textContent = {{ risk_analysis.critical_risks }};
+                document.getElementById('warning-count').textContent = {{ risk_analysis.warnings }};
+                document.getElementById('spn-analyzed').textContent = {{ risk_analysis.total_spns }};
+                document.getElementById('security-score').textContent = '{{ risk_analysis.security_score }}%';
+                
+                // Update security score card color based on actual score
+                const scoreCard = document.querySelector('.summary-card.success');
+                const score = {{ risk_analysis.security_score }};
+                if (score < 60) {
+                    scoreCard.className = 'summary-card critical';
+                } else if (score < 80) {
+                    scoreCard.className = 'summary-card warning';
+                } else {
+                    scoreCard.className = 'summary-card success';
+                }
+            {% else %}
+                // Fallback to analysis content parsing
+                const analysisContent = document.querySelector('.section-content')?.textContent?.toLowerCase() || '';
+                
+                // Count keywords to estimate severity
+                const criticalKeywords = ['critical', 'severe', 'high risk', 'vulnerable', 'exposed'];
+                const warningKeywords = ['warning', 'medium', 'concern', 'review', 'attention'];
+                
+                let criticalCount = 0;
+                let warningCount = 0;
+                
+                criticalKeywords.forEach(keyword => {
+                    const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
+                    criticalCount += matches;
+                });
+                
+                warningKeywords.forEach(keyword => {
+                    const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
+                    warningCount += matches;
+                });
 
-            // Update summary cards
-            document.getElementById('critical-count').textContent = Math.min(criticalCount, 5);
-            document.getElementById('warning-count').textContent = Math.min(warningCount, 8);
-            document.getElementById('spn-analyzed').textContent = '50'; // Based on your API limit
-            
-            // Calculate security score (lower is better due to issues found)
-            const totalIssues = criticalCount + warningCount;
-            const securityScore = Math.max(0, 100 - (totalIssues * 10));
-            document.getElementById('security-score').textContent = securityScore + '%';
-            
-            // Update security score card color based on score
-            const scoreCard = document.querySelector('.summary-card.success');
-            if (securityScore < 60) {
-                scoreCard.className = 'summary-card critical';
-            } else if (securityScore < 80) {
-                scoreCard.className = 'summary-card warning';
-            } else {
-                scoreCard.className = 'summary-card success';
-            }
+                // Update summary cards
+                document.getElementById('critical-count').textContent = Math.min(criticalCount, 5);
+                document.getElementById('warning-count').textContent = Math.min(warningCount, 8);
+                document.getElementById('spn-analyzed').textContent = '50'; // Based on your API limit
+                
+                // Calculate security score (lower is better due to issues found)
+                const totalIssues = criticalCount + warningCount;
+                const securityScore = Math.max(0, 100 - (totalIssues * 10));
+                document.getElementById('security-score').textContent = securityScore + '%';
+                
+                // Update security score card color based on score
+                const scoreCard = document.querySelector('.summary-card.success');
+                if (securityScore < 60) {
+                    scoreCard.className = 'summary-card critical';
+                } else if (securityScore < 80) {
+                    scoreCard.className = 'summary-card warning';
+                } else {
+                    scoreCard.className = 'summary-card success';
+                }
+            {% endif %}
         }
 
         function exportReport() {
