@@ -369,15 +369,18 @@
         <section class="status-grid">
             <div class="status-item glass">
                 <span class="status-value" id="spn-count">--</span>
-                <div class="status-label">Service Principals</div>
+                <div class="status-label">Total Service Principals</div>
             </div>
-            <div class="status-item glass">
+            <div class="status-item glass" id="risk-factor-card">
                 <span class="status-value" id="risk-count">--</span>
-                <div class="status-label">Risk Factors</div>
+                <div class="status-label">SPNs with Security Risks</div>
+                <div class="status-sublabel" style="font-size: 0.8rem; color: var(--secondary-text); margin-top: 0.25rem;">
+                    Click for breakdown
+                </div>
             </div>
             <div class="status-item glass">
                 <span class="status-value" id="last-scan">--</span>
-                <div class="status-label">Last Scan</div>
+                <div class="status-label" id="last-scan-label">Security Score</div>
             </div>
             <div class="status-item glass">
                 <span class="status-value" id="status">🟢</span>
@@ -504,24 +507,162 @@
         }
 
         function showRiskDetails(details) {
-            if (!details || !details.risk_details) return;
+            if (!details) return;
             
-            let message = `Security Risk Summary:\n\n`;
-            message += `Critical Risks: ${details.critical_risks}\n`;
-            message += `Warnings: ${details.warnings}\n\n`;
-            message += `Top Risk Factors:\n`;
+            let message = `🛡️ SECURITY RISK BREAKDOWN\n`;
+            message += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
             
-            details.risk_details.forEach((detail, index) => {
-                message += `${index + 1}. ${detail.spn_name}\n`;
-                detail.risks.forEach(risk => {
-                    message += `   • ${risk}\n`;
+            // High-level summary
+            message += `📊 SUMMARY:\n`;
+            message += `• ${details.breakdown || 'Breakdown unavailable'}\n`;
+            message += `• Total Risk Factors Found: ${details.total_risk_factors || 0}\n\n`;
+            
+            // Risk level breakdown
+            message += `🚨 RISK LEVELS:\n`;
+            message += `• Critical Risk SPNs: ${details.critical_risk_spns || 0}\n`;
+            message += `• Warning Level SPNs: ${details.warning_spns || 0}\n`;
+            message += `• Low Risk SPNs: ${details.low_risk_spns || 0}\n`;
+            message += `• Clean SPNs: ${details.clean_spns || 0}\n\n`;
+            
+            // Top risky SPNs
+            if (details.risk_details && details.risk_details.length > 0) {
+                message += `⚠️ TOP RISKY SERVICE PRINCIPALS:\n`;
+                details.risk_details.forEach((detail, index) => {
+                    const riskIcon = detail.risk_level === 'critical' ? '🔴' : 
+                                   detail.risk_level === 'warning' ? '🟡' : '🔵';
+                    message += `${index + 1}. ${riskIcon} ${detail.spn_name}\n`;
+                    message += `   App ID: ${detail.app_id}\n`;
+                    message += `   Risk Level: ${detail.risk_level.toUpperCase()}\n`;
+                    message += `   Issues Found: ${detail.risk_count || detail.risks.length}\n`;
+                    
+                    if (detail.risks) {
+                        detail.risks.forEach(risk => {
+                            message += `   • ${risk}\n`;
+                        });
+                    }
+                    message += `\n`;
                 });
-                message += `\n`;
-            });
+            }
             
-            message += `\nClick "Security Analysis" for detailed remediation steps.`;
+            message += `💡 NEXT STEPS:\n`;
+            message += `• Click "Security Analysis" for AI-powered recommendations\n`;
+            message += `• Review critical SPNs immediately\n`;
+            message += `• Consider disabling unused service principals\n`;
+            message += `\n📈 Note: Risk Factors = Number of SPNs with security issues`;
             
-            alert(message);
+            // Create a better modal instead of alert
+            showDetailedModal('Security Risk Analysis', message);
+        }
+
+        function showDetailedModal(title, content) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: var(--secondary-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 700px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: var(--primary-text);
+                font-family: 'Courier New', monospace;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                white-space: pre-wrap;
+                position: relative;
+                box-shadow: var(--shadow-dark);
+            `;
+            
+            const titleElement = document.createElement('h2');
+            titleElement.textContent = title;
+            titleElement.style.cssText = `
+                color: var(--accent-text);
+                margin-bottom: 1rem;
+                font-family: 'Segoe UI', sans-serif;
+                border-bottom: 2px solid var(--border-color);
+                padding-bottom: 0.5rem;
+            `;
+            
+            const contentElement = document.createElement('div');
+            contentElement.textContent = content;
+            contentElement.style.marginBottom = '1rem';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '✕';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                background: none;
+                border: none;
+                color: var(--accent-text);
+                font-size: 1.5rem;
+                cursor: pointer;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background 0.3s ease;
+            `;
+            
+            const actionBtn = document.createElement('a');
+            actionBtn.href = '/analyze';
+            actionBtn.textContent = '🔍 Run Full Analysis';
+            actionBtn.style.cssText = `
+                display: inline-block;
+                background: var(--gradient-accent);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+                margin-top: 1rem;
+                transition: transform 0.3s ease;
+            `;
+            actionBtn.onmouseover = () => actionBtn.style.transform = 'translateY(-2px)';
+            actionBtn.onmouseout = () => actionBtn.style.transform = 'translateY(0)';
+            
+            closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(0, 212, 255, 0.2)';
+            closeBtn.onmouseout = () => closeBtn.style.background = 'none';
+            closeBtn.onclick = () => modal.remove();
+            
+            modalContent.appendChild(titleElement);
+            modalContent.appendChild(contentElement);
+            modalContent.appendChild(actionBtn);
+            modalContent.appendChild(closeBtn);
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Close on click outside
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+            
+            // Close on Escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    modal.remove();
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
         }
 
         function showApiInfo() {

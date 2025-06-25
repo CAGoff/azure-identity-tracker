@@ -31,33 +31,51 @@ def analyze_risk_factors(spns: List[Dict]) -> Dict[str, Any]:
     if not isinstance(spns, list) or not spns:
         return {
             "total_spns": 0,
-            "risk_factors": 0,
-            "critical_risks": 0,
-            "warnings": 0,
-            "security_score": 0,
-            "risk_details": []
+            "spns_with_risks": 0,
+            "total_risk_factors": 0,
+            "critical_risk_spns": 0,
+            "warning_spns": 0,
+            "low_risk_spns": 0,
+            "security_score": 100,
+            "risk_details": [],
+            "summary": {
+                "clean_spns": 0,
+                "risky_spns": 0,
+                "total_issues": 0
+            }
         }
     
     total_spns = len(spns)
-    risk_factors = 0
-    critical_risks = 0
-    warnings = 0
+    total_risk_factors = 0  # Total number of individual risk factors
+    spns_with_risks = 0     # Number of SPNs that have at least one risk
+    critical_risk_spns = 0  # SPNs with critical-level risks
+    warning_spns = 0        # SPNs with warning-level risks
+    low_risk_spns = 0       # SPNs with low-level risks
     risk_details = []
     
     for spn in spns:
         spn_risks = []
+        spn_critical_count = 0
+        spn_warning_count = 0
+        spn_low_count = 0
         
-        # Check for disabled SPNs (potential orphaned identities)
+        # Check for disabled SPNs (CRITICAL - potential orphaned identities)
         if not spn.get('accountEnabled', True):
-            risk_factors += 1
-            warnings += 1
-            spn_risks.append("Disabled service principal (potential orphan)")
+            total_risk_factors += 1
+            spn_critical_count += 1
+            spn_risks.append({"level": "critical", "issue": "Disabled service principal (potential orphan)"})
         
-        # Check for SPNs without display names
+        # Check for SPNs without display names (WARNING)
         if not spn.get('displayName') or spn.get('displayName', '').strip() == '':
-            risk_factors += 1
-            warnings += 1
-            spn_risks.append("Missing display name")
+            total_risk_factors += 1
+            spn_warning_count += 1
+            spn_risks.append({"level": "warning", "issue": "Missing display name"})
+        
+        # Check for SPNs without app IDs (CRITICAL - unusual)
+        if not spn.get('appId'):
+            total_risk_factors += 1
+            spn_critical_count += 1
+            spn_risks.append({"level": "critical", "issue": "Missing application ID"})
         
         # Check for very old SPNs (potential legacy)
         created_date = spn.get('createdDateTime')
@@ -66,54 +84,87 @@ def analyze_risk_factors(spns: List[Dict]) -> Dict[str, Any]:
                 created = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
                 age_days = (datetime.now().replace(tzinfo=created.tzinfo) - created).days
                 
-                if age_days > 365 * 2:  # Older than 2 years
-                    risk_factors += 1
-                    warnings += 1
-                    spn_risks.append(f"Legacy SPN (created {age_days} days ago)")
-                elif age_days > 365 * 5:  # Older than 5 years
-                    risk_factors += 1
-                    critical_risks += 1
-                    spn_risks.append(f"Very old SPN (created {age_days} days ago)")
+                if age_days > 365 * 5:  # Older than 5 years - CRITICAL
+                    total_risk_factors += 1
+                    spn_critical_count += 1
+                    spn_risks.append({"level": "critical", "issue": f"Very old SPN (created {age_days} days ago)"})
+                elif age_days > 365 * 2:  # Older than 2 years - WARNING
+                    total_risk_factors += 1
+                    spn_warning_count += 1
+                    spn_risks.append({"level": "warning", "issue": f"Legacy SPN (created {age_days} days ago)"})
+                elif age_days > 365:  # Older than 1 year - LOW
+                    total_risk_factors += 1
+                    spn_low_count += 1
+                    spn_risks.append({"level": "low", "issue": f"Aging SPN (created {age_days} days ago)"})
             except:
                 pass
         
-        # Check for SPNs with suspicious patterns in names
+        # Check for SPNs with suspicious patterns in names (WARNING)
         display_name = spn.get('displayName', '').lower()
-        suspicious_patterns = ['test', 'temp', 'dev', 'old', 'backup', 'deprecated']
+        suspicious_patterns = ['test', 'temp', 'dev', 'old', 'backup', 'deprecated', 'demo', 'sandbox']
         for pattern in suspicious_patterns:
             if pattern in display_name:
-                risk_factors += 1
-                warnings += 1
-                spn_risks.append(f"Suspicious name pattern: '{pattern}'")
+                total_risk_factors += 1
+                spn_warning_count += 1
+                spn_risks.append({"level": "warning", "issue": f"Suspicious name pattern: '{pattern}'"})
                 break
         
-        # Check for SPNs without app IDs (unusual)
-        if not spn.get('appId'):
-            risk_factors += 1
-            critical_risks += 1
-            spn_risks.append("Missing application ID")
-        
+        # If this SPN has any risks, count it and categorize it
         if spn_risks:
+            spns_with_risks += 1
+            
+            # Categorize SPN based on highest risk level
+            if spn_critical_count > 0:
+                critical_risk_spns += 1
+            elif spn_warning_count > 0:
+                warning_spns += 1
+            else:
+                low_risk_spns += 1
+            
             risk_details.append({
                 "spn_name": spn.get('displayName', 'Unknown'),
                 "app_id": spn.get('appId', 'N/A'),
-                "risks": spn_risks
+                "risk_level": "critical" if spn_critical_count > 0 else "warning" if spn_warning_count > 0 else "low",
+                "risk_count": len(spn_risks),
+                "critical_issues": spn_critical_count,
+                "warning_issues": spn_warning_count,
+                "low_issues": spn_low_count,
+                "risks": [risk["issue"] for risk in spn_risks],
+                "risk_details": spn_risks
             })
     
-    # Calculate security score (0-100, higher is better)
+    # Calculate security score based on risky SPNs percentage
+    clean_spns = total_spns - spns_with_risks
     if total_spns == 0:
         security_score = 100
     else:
-        risk_percentage = (risk_factors / total_spns) * 100
-        security_score = max(0, 100 - risk_percentage)
+        # Base score on percentage of clean SPNs, weighted by risk severity
+        clean_percentage = (clean_spns / total_spns) * 100
+        critical_penalty = (critical_risk_spns / total_spns) * 30  # Critical SPNs reduce score by up to 30%
+        warning_penalty = (warning_spns / total_spns) * 15       # Warning SPNs reduce score by up to 15%
+        low_penalty = (low_risk_spns / total_spns) * 5           # Low-risk SPNs reduce score by up to 5%
+        
+        security_score = max(0, clean_percentage - critical_penalty - warning_penalty - low_penalty)
     
     return {
         "total_spns": total_spns,
-        "risk_factors": risk_factors,
-        "critical_risks": critical_risks,
-        "warnings": warnings,
+        "spns_with_risks": spns_with_risks,
+        "total_risk_factors": total_risk_factors,
+        "critical_risk_spns": critical_risk_spns,
+        "warning_spns": warning_spns,
+        "low_risk_spns": low_risk_spns,
         "security_score": round(security_score, 1),
-        "risk_details": risk_details
+        "risk_details": risk_details,
+        "summary": {
+            "clean_spns": clean_spns,
+            "risky_spns": spns_with_risks,
+            "total_issues": total_risk_factors,
+            "breakdown": f"{clean_spns} clean, {spns_with_risks} risky ({total_risk_factors} total issues)"
+        },
+        # Legacy fields for backward compatibility
+        "risk_factors": spns_with_risks,  # Now represents SPNs with risks, not total risk count
+        "critical_risks": critical_risk_spns,
+        "warnings": warning_spns
     }
 
 def markdown_to_html(text: str) -> str:
@@ -148,7 +199,7 @@ async def home(request: Request):
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats():
     """
-    API endpoint that provides real dashboard statistics
+    API endpoint that provides comprehensive dashboard statistics
     This is what the home page JavaScript calls to populate the stats
     """
     try:
@@ -170,29 +221,52 @@ async def get_dashboard_stats():
                 status_code=500
             )
         
-        # Analyze risks
+        # Analyze risks with new detailed system
         risk_analysis = analyze_risk_factors(spns)
         
         # Update cache
         dashboard_cache.update({
             "last_scan": datetime.now().isoformat(),
-            "risk_factors": risk_analysis["risk_factors"],
+            "risk_factors": risk_analysis["spns_with_risks"],
             "security_score": risk_analysis["security_score"]
         })
+        
+        # Determine system status based on risk levels
+        if risk_analysis["critical_risk_spns"] > 0:
+            status = "🔴"  # Critical issues present
+        elif risk_analysis["warning_spns"] > 3:
+            status = "🟡"  # Multiple warnings
+        elif risk_analysis["spns_with_risks"] > 0:
+            status = "🟡"  # Some risks present
+        else:
+            status = "🟢"  # All clear
         
         return {
             "status": "success",
             "stats": {
                 "spn_count": risk_analysis["total_spns"],
-                "risk_factors": risk_analysis["risk_factors"],
+                "risk_factors": risk_analysis["spns_with_risks"],  # SPNs with at least one risk
                 "security_score": f"{risk_analysis['security_score']}%",
                 "last_scan": "Just now",
-                "status": "🟢" if risk_analysis["critical_risks"] == 0 else "🟡" if risk_analysis["critical_risks"] < 3 else "🔴"
+                "status": status
             },
             "details": {
-                "critical_risks": risk_analysis["critical_risks"],
-                "warnings": risk_analysis["warnings"],
-                "risk_details": risk_analysis["risk_details"][:5]  # Top 5 for summary
+                "critical_risk_spns": risk_analysis["critical_risk_spns"],
+                "warning_spns": risk_analysis["warning_spns"],
+                "low_risk_spns": risk_analysis["low_risk_spns"],
+                "clean_spns": risk_analysis["summary"]["clean_spns"],
+                "total_risk_factors": risk_analysis["total_risk_factors"],
+                "risk_details": risk_analysis["risk_details"][:5],  # Top 5 for summary
+                "breakdown": risk_analysis["summary"]["breakdown"]
+            },
+            "metadata": {
+                "calculation_method": "SPNs with risks (not total risk factors)",
+                "risk_levels": {
+                    "critical": f"{risk_analysis['critical_risk_spns']} SPNs",
+                    "warning": f"{risk_analysis['warning_spns']} SPNs", 
+                    "low": f"{risk_analysis['low_risk_spns']} SPNs",
+                    "clean": f"{risk_analysis['summary']['clean_spns']} SPNs"
+                }
             }
         }
         
