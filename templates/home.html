@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Identity Tracker</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --accent-bg: #2a2a2a;
+            --primary-text: #ffffff;
+            --secondary-text: #b0b0b0;
+            --accent-text: #00d4ff;
+            --border-color: #333333;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-accent: linear-gradient(135deg, #00d4ff 0%, #5b86e5 100%);
+            --shadow-light: 0 4px 15px rgba(255, 255, 255, 0.1);
+            --shadow-dark: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--primary-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+            animation: pulse 15s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Header */
+        .header {
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--secondary-text);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-text);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-accent);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Main Content */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .hero-section {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--secondary-text);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .card {
+            background: rgba(26, 26, 26, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-accent);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-dark);
+            border-color: var(--accent-text);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary-text);
+        }
+
+        .card-description {
+            color: var(--secondary-text);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: var(--gradient-accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent-text);
+            border: 2px solid var(--accent-text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent-text);
+            color: var(--primary-bg);
+        }
+
+        /* Status Indicators */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .status-item {
+            background: rgba(42, 42, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .status-item:hover {
+            background: rgba(42, 42, 42, 0.9);
+        }
+
+        .status-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-text);
+            display: block;
+        }
+
+        .status-label {
+            color: var(--secondary-text);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .main-container {
+                padding: 2rem 1rem;
+            }
+
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--accent-text);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Glassmorphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <header class="header">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                Azure Identity Tracker
+            </div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/spns">Service Principals</a></li>
+                    <li><a href="/analyze">Security Analysis</a></li>
+                    <li><a href="/report/html">Reports</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <section class="hero-section">
+            <h1 class="hero-title">Azure Identity Security</h1>
+            <p class="hero-subtitle">
+                Advanced AI-powered analysis of your Azure Active Directory service principals. 
+                Identify security risks, unused identities, and excessive permissions before they become threats.
+            </p>
+        </section>
+
+        <section class="status-grid">
+            <div class="status-item glass">
+                <span class="status-value" id="spn-count">--</span>
+                <div class="status-label">Service Principals</div>
+            </div>
+            <div class="status-item glass">
+                <span class="status-value" id="risk-count">--</span>
+                <div class="status-label">Risk Factors</div>
+            </div>
+            <div class="status-item glass">
+                <span class="status-value" id="last-scan">--</span>
+                <div class="status-label">Last Scan</div>
+            </div>
+            <div class="status-item glass">
+                <span class="status-value" id="status">🟢</span>
+                <div class="status-label">System Status</div>
+            </div>
+        </section>
+
+        <section class="cards-grid">
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3 class="card-title">Security Analysis</h3>
+                <p class="card-description">
+                    Run comprehensive AI-powered security analysis on your Azure service principals. 
+                    Identify potential risks, unused identities, and over-privileged accounts.
+                </p>
+                <a href="/analyze" class="btn btn-primary">
+                    <i class="fas fa-play"></i>
+                    Start Analysis
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-list"></i>
+                </div>
+                <h3 class="card-title">Service Principals</h3>
+                <p class="card-description">
+                    View and manage all service principals in your Azure AD tenant. 
+                    Get detailed information about applications, permissions, and status.
+                </p>
+                <a href="/spns" class="btn btn-secondary">
+                    <i class="fas fa-eye"></i>
+                    View SPNs
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h3 class="card-title">Security Reports</h3>
+                <p class="card-description">
+                    Generate detailed security reports with actionable insights. 
+                    Export findings and track improvements over time.
+                </p>
+                <a href="/report/html" class="btn btn-secondary">
+                    <i class="fas fa-file-alt"></i>
+                    View Reports
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <h3 class="card-title">API Access</h3>
+                <p class="card-description">
+                    Integrate with your existing security tools using our REST API. 
+                    Automate security checks and build custom dashboards.
+                </p>
+                <a href="#" class="btn btn-secondary" onclick="showApiInfo()">
+                    <i class="fas fa-code"></i>
+                    API Docs
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Load dashboard stats
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch('/spns');
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    document.getElementById('spn-count').textContent = data.length;
+                    document.getElementById('risk-count').textContent = Math.floor(data.length * 0.15); // Mock risk count
+                    document.getElementById('last-scan').textContent = 'Just now';
+                    document.getElementById('status').textContent = '🟢';
+                } else {
+                    document.getElementById('spn-count').textContent = 'Error';
+                    document.getElementById('status').textContent = '🔴';
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                document.getElementById('spn-count').textContent = 'Error';
+                document.getElementById('status').textContent = '🔴';
+            }
+        }
+
+        function showApiInfo() {
+            alert(`Azure Identity Tracker API Endpoints:
+
+GET /spns - List all service principals
+POST /analyze - Run security analysis
+GET /report/html - View HTML report
+GET /token - Test authentication
+
+Base URL: ${window.location.origin}`);
+        }
+
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', loadDashboardStats);
+
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

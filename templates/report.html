@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Azure Identity Tracker - SPN Report</title>
+  <style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  h1 {
+    color: #ffffff;
+  }
+
+  input[type="text"] {
+    width: 300px;
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #1f1f1f;
+    border: 1px solid #555;
+    color: #e0e0e0;
+  }
+
+  #download-btn {
+    margin-left: 20px;
+    padding: 8px 12px;
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
+    cursor: pointer;
+  }
+
+  #download-btn:hover {
+    background-color: #444;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    background-color: #1e1e1e;
+  }
+
+  th, td {
+    border: 1px solid #333;
+    padding: 8px;
+    text-align: left;
+  }
+
+  th {
+    background-color: #272727;
+    color: #ffffff;
+  }
+
+  tr:nth-child(even) {
+    background-color: #202020;
+  }
+
+  tr:hover {
+    background-color: #2a2a2a;
+  }
+</style>
+
+</head>
+<body>
+  <h1>Azure Identity Tracker - SPN Overview</h1>
+
+  <input type="text" id="filterInput" placeholder="Filter by name, appId, or date..." onkeyup="filterTable()" />
+  <button id="download-btn" onclick="downloadCSV()">Download CSV</button>
+
+  <table id="spnTable">
+    <thead>
+      <tr>
+        <th>Display Name</th>
+        <th>App ID</th>
+        <th>Enabled</th>
+        <th>Created Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for spn in report %}
+      <tr>
+        <td>{{ spn.displayName }}</td>
+        <td>{{ spn.appId }}</td>
+        <td>{{ 'Yes' if spn.enabled else 'No' }}</td>
+        <td>{{ spn.createdDateTime }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function filterTable() {
+      const input = document.getElementById("filterInput").value.toLowerCase();
+      const rows = document.querySelectorAll("#spnTable tbody tr");
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(input) ? "" : "none";
+      });
+    }
+
+    function downloadCSV() {
+      let csv = "Display Name,App ID,Enabled,Created Date\n";
+      const rows = document.querySelectorAll("#spnTable tbody tr");
+
+      rows.forEach(row => {
+        if (row.style.display !== "none") {
+          const cols = row.querySelectorAll("td");
+          const values = Array.from(cols).map(td => `"${td.innerText}"`);
+          csv += values.join(",") + "\n";
+        }
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "azure_identity_report.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
