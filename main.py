@@ -133,18 +133,30 @@ def analyze_risk_factors(spns: List[Dict]) -> Dict[str, Any]:
                 "risk_details": spn_risks
             })
     
-    # Calculate security score based on risky SPNs percentage
+    # Calculate security score based on weighted risk assessment
     clean_spns = total_spns - spns_with_risks
     if total_spns == 0:
         security_score = 100
     else:
-        # Base score on percentage of clean SPNs, weighted by risk severity
-        clean_percentage = (clean_spns / total_spns) * 100
-        critical_penalty = (critical_risk_spns / total_spns) * 30  # Critical SPNs reduce score by up to 30%
-        warning_penalty = (warning_spns / total_spns) * 15       # Warning SPNs reduce score by up to 15%
-        low_penalty = (low_risk_spns / total_spns) * 5           # Low-risk SPNs reduce score by up to 5%
+        # Start with base score based on clean SPNs (0-70% range)
+        clean_ratio = clean_spns / total_spns
+        base_score = clean_ratio * 70  # Max 70% just for having clean SPNs
         
-        security_score = max(0, clean_percentage - critical_penalty - warning_penalty - low_penalty)
+        # Add points for low severity (acceptable risk level)
+        low_risk_bonus = (low_risk_spns / total_spns) * 20  # Up to 20% for manageable risks
+        
+        # Subtract significant penalties for serious risks
+        warning_penalty = (warning_spns / total_spns) * 25   # Up to 25% penalty
+        critical_penalty = (critical_risk_spns / total_spns) * 40  # Up to 40% penalty
+        
+        # Calculate final score with floor of 5% (never completely zero unless all critical)
+        raw_score = base_score + low_risk_bonus - warning_penalty - critical_penalty
+        
+        # Special case: if more than 50% of SPNs are critical risk, score can go to 0
+        if critical_risk_spns > (total_spns * 0.5):
+            security_score = max(0, raw_score)
+        else:
+            security_score = max(5, raw_score)  # Minimum 5% unless majority critical
     
     return {
         "total_spns": total_spns,
@@ -259,13 +271,30 @@ async def get_dashboard_stats():
                 "risk_details": risk_analysis["risk_details"][:5],  # Top 5 for summary
                 "breakdown": risk_analysis["summary"]["breakdown"]
             },
+            "debug": {
+                "score_calculation": {
+                    "clean_spns": risk_analysis["summary"]["clean_spns"],
+                    "risky_spns": risk_analysis["spns_with_risks"],
+                    "critical_count": risk_analysis["critical_risk_spns"],
+                    "warning_count": risk_analysis["warning_spns"],
+                    "low_risk_count": risk_analysis["low_risk_spns"],
+                    "final_score": risk_analysis["security_score"]
+                }
+            },
             "metadata": {
-                "calculation_method": "SPNs with risks (not total risk factors)",
+                "calculation_method": "Weighted risk assessment: 70% base + low risk bonus - warning/critical penalties",
                 "risk_levels": {
                     "critical": f"{risk_analysis['critical_risk_spns']} SPNs",
                     "warning": f"{risk_analysis['warning_spns']} SPNs", 
                     "low": f"{risk_analysis['low_risk_spns']} SPNs",
                     "clean": f"{risk_analysis['summary']['clean_spns']} SPNs"
+                },
+                "score_interpretation": {
+                    "80-100": "Excellent security posture",
+                    "60-79": "Good with room for improvement", 
+                    "40-59": "Fair - some security concerns",
+                    "20-39": "Poor - significant risks present",
+                    "0-19": "Critical - immediate action required"
                 }
             }
         }
