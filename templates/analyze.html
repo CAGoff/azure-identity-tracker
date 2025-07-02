@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Analysis - Azure Identity Tracker</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --accent-bg: #2a2a2a;
+            --primary-text: #ffffff;
+            --secondary-text: #b0b0b0;
+            --accent-text: #00d4ff;
+            --border-color: #333333;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --info-color: #3b82f6;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-accent: linear-gradient(135deg, #00d4ff 0%, #5b86e5 100%);
+            --gradient-success: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            --gradient-warning: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
+            --gradient-danger: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            --shadow-light: 0 4px 15px rgba(255, 255, 255, 0.1);
+            --shadow-dark: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--primary-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+            animation: pulse 15s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Header */
+        .header {
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--secondary-text);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .back-btn:hover {
+            color: var(--accent-text);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        /* Main Content */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-subtitle {
+            color: var(--secondary-text);
+            font-size: 1.1rem;
+        }
+
+        /* Loading State */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid var(--accent-text);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: var(--secondary-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .loading-subtext {
+            color: var(--secondary-text);
+            opacity: 0.7;
+        }
+
+        /* Analysis Results */
+        .analysis-container {
+            display: none;
+        }
+
+        .analysis-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .summary-card {
+            background: rgba(26, 26, 26, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .summary-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .summary-card.critical::before {
+            background: var(--gradient-danger);
+        }
+
+        .summary-card.warning::before {
+            background: var(--gradient-warning);
+        }
+
+        .summary-card.info::before {
+            background: var(--gradient-accent);
+        }
+
+        .summary-card.success::before {
+            background: var(--gradient-success);
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-dark);
+        }
+
+        .summary-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .summary-card.critical .summary-icon {
+            color: var(--danger-color);
+        }
+
+        .summary-card.warning .summary-icon {
+            color: var(--warning-color);
+        }
+
+        .summary-card.info .summary-icon {
+            color: var(--info-color);
+        }
+
+        .summary-card.success .summary-icon {
+            color: var(--success-color);
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-text);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-label {
+            color: var(--secondary-text);
+            font-size: 0.9rem;
+        }
+
+        /* Analysis Report */
+        .analysis-report {
+            background: rgba(26, 26, 26, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-content {
+            color: var(--secondary-text);
+            line-height: 1.7;
+        }
+
+        .section-content h1,
+        .section-content h2,
+        .section-content h3,
+        .section-content h4 {
+            color: var(--accent-text);
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        .section-content ul {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .section-content li {
+            margin-bottom: 0.5rem;
+        }
+
+        .section-content strong {
+            color: var(--primary-text);
+        }
+
+        .section-content code {
+            background: var(--accent-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: var(--accent-text);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: var(--gradient-accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent-text);
+            border: 2px solid var(--accent-text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent-text);
+            color: var(--primary-bg);
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Error State */
+        .error-container {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .error-icon {
+            font-size: 4rem;
+            color: var(--danger-color);
+            margin-bottom: 1rem;
+        }
+
+        .error-title {
+            font-size: 1.5rem;
+            color: var(--primary-text);
+            margin-bottom: 1rem;
+        }
+
+        .error-message {
+            color: var(--secondary-text);
+            margin-bottom: 2rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+
+            .page-title {
+                font-size: 2rem;
+            }
+
+            .analysis-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .analysis-summary {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Fade in animation */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <header class="header">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                Azure Identity Tracker
+            </div>
+            <a href="/" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Back to Dashboard
+            </a>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <div class="page-header">
+            <h1 class="page-title">Security Analysis</h1>
+            <p class="page-subtitle">AI-powered analysis of your Azure Active Directory service principals</p>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-container" id="loading-state">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Analyzing Service Principals...</div>
+            <div class="loading-subtext">This may take a few moments while we examine your Azure AD environment</div>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container" id="error-state">
+            <div class="error-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="error-title">Analysis Failed</h2>
+            <p class="error-message" id="error-message">
+                Unable to complete the security analysis. Please check your connection and try again.
+            </p>
+            <div class="action-buttons">
+                <a href="#" class="btn btn-primary" onclick="runAnalysis()">
+                    <i class="fas fa-redo"></i>
+                    Retry Analysis
+                </a>
+                <a href="/" class="btn btn-secondary">
+                    <i class="fas fa-home"></i>
+                    Return Home
+                </a>
+            </div>
+        </div>
+
+        <!-- Analysis Results -->
+        <div class="analysis-container fade-in" id="analysis-results">
+            <!-- Summary Cards -->
+            <div class="analysis-summary">
+                <div class="summary-card critical">
+                    <div class="summary-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <span class="summary-value" id="critical-count">0</span>
+                    <div class="summary-label">Critical Risk SPNs</div>
+                    <div style="font-size: 0.75rem; color: var(--secondary-text); margin-top: 0.25rem;">
+                        Service principals with critical issues
+                    </div>
+                </div>
+
+                <div class="summary-card warning">
+                    <div class="summary-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <span class="summary-value" id="warning-count">0</span>
+                    <div class="summary-label">Warning Level SPNs</div>
+                    <div style="font-size: 0.75rem; color: var(--secondary-text); margin-top: 0.25rem;">
+                        Service principals with warnings
+                    </div>
+                </div>
+
+                <div class="summary-card info">
+                    <div class="summary-icon">
+                        <i class="fas fa-info-circle"></i>
+                    </div>
+                    <span class="summary-value" id="spn-analyzed">0</span>
+                    <div class="summary-label">Total SPNs Analyzed</div>
+                    <div style="font-size: 0.75rem; color: var(--secondary-text); margin-top: 0.25rem;">
+                        All service principals checked
+                    </div>
+                </div>
+
+                <div class="summary-card success">
+                    <div class="summary-icon">
+                        <i class="fas fa-shield-check"></i>
+                    </div>
+                    <span class="summary-value" id="security-score">0%</span>
+                    <div class="summary-label">Security Score</div>
+                    <div style="font-size: 0.75rem; color: var(--secondary-text); margin-top: 0.25rem;">
+                        Overall security rating
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Report -->
+            <div class="analysis-report">
+                {% if sections %}
+                    {% for section_name, section_content in sections.items() %}
+                    <div class="section">
+                        <h2 class="section-title">
+                            <i class="fas fa-{{ 'chart-line' if 'overview' in section_name.lower() else 'list' if 'finding' in section_name.lower() else 'lightbulb' if 'recommendation' in section_name.lower() else 'info-circle' }}"></i>
+                            {{ section_name.replace('_', ' ').title() }}
+                        </h2>
+                        <div class="section-content">
+                            {{ section_content | safe }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="section">
+                        <h2 class="section-title">
+                            <i class="fas fa-chart-line"></i>
+                            Analysis Report
+                        </h2>
+                        <div class="section-content" id="analysis-content">
+                            <!-- Analysis content will be loaded here -->
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="#" class="btn btn-primary" onclick="exportReport()">
+                    <i class="fas fa-download"></i>
+                    Export Report
+                </a>
+                <a href="/report/html" class="btn btn-secondary">
+                    <i class="fas fa-file-alt"></i>
+                    View Detailed Report
+                </a>
+                <a href="#" class="btn btn-success" onclick="runAnalysis()">
+                    <i class="fas fa-sync-alt"></i>
+                    Re-run Analysis
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let analysisData = null;
+
+        // Auto-run analysis on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we have pre-rendered sections
+            const hasPreRendered = document.querySelector('.section-content').innerHTML.trim() !== '';
+            
+            if (!hasPreRendered) {
+                runAnalysis();
+            } else {
+                // Show results immediately if pre-rendered
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('analysis-results').style.display = 'block';
+                updateSummaryCards();
+            }
+        });
+
+        async function runAnalysis() {
+            // Show loading state
+            document.getElementById('loading-state').style.display = 'flex';
+            document.getElementById('analysis-results').style.display = 'none';
+            document.getElementById('error-state').style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                analysisData = data;
+
+                // Hide loading, show results
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('analysis-results').style.display = 'block';
+
+                // Update content
+                updateAnalysisContent(data.analysis);
+                updateSummaryCards();
+
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                
+                // Show error state
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('error-state').style.display = 'block';
+                document.getElementById('error-message').textContent = error.message;
+            }
+        }
+
+        function updateAnalysisContent(analysisText) {
+            const contentElement = document.getElementById('analysis-content');
+            if (contentElement && analysisText) {
+                // Convert markdown-like text to HTML
+                let formattedText = analysisText
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+                    .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+                    .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+                    .replace(/^- (.*?)$/gm, '<li>$1</li>')
+                    .replace(/\n/g, '<br>');
+
+                // Wrap consecutive <li> elements in <ul>
+                formattedText = formattedText.replace(/(<li>.*?<\/li>(?:<br><li>.*?<\/li>)*)/g, '<ul>$1</ul>');
+                formattedText = formattedText.replace(/<\/li><br><li>/g, '</li><li>');
+
+                contentElement.innerHTML = formattedText;
+            }
+        }
+
+        function updateSummaryCards() {
+            // Use real data from backend if available
+            {% if risk_analysis %}
+                // Use the new consistent risk analysis data
+                document.getElementById('critical-count').textContent = {{ risk_analysis.critical_risk_spns }};
+                document.getElementById('warning-count').textContent = {{ risk_analysis.warning_spns }};
+                document.getElementById('spn-analyzed').textContent = {{ risk_analysis.total_spns }};
+                document.getElementById('security-score').textContent = '{{ risk_analysis.security_score }}%';
+                
+                // Update security score card color based on actual score
+                const scoreCard = document.querySelector('.summary-card.success');
+                const score = {{ risk_analysis.security_score }};
+                if (score < 60) {
+                    scoreCard.className = 'summary-card critical';
+                } else if (score < 80) {
+                    scoreCard.className = 'summary-card warning';
+                } else {
+                    scoreCard.className = 'summary-card success';
+                }
+                
+                // Add detailed breakdown information
+                const criticalCard = document.querySelector('.summary-card.critical');
+                const warningCard = document.querySelector('.summary-card.warning');
+                
+                // Add tooltips/click handlers for more details
+                criticalCard.title = 'SPNs with critical security issues ({{ risk_analysis.critical_risk_spns }} total)';
+                warningCard.title = 'SPNs with warning-level issues ({{ risk_analysis.warning_spns }} total)';
+                
+                // Make cards clickable to show breakdown
+                criticalCard.style.cursor = 'pointer';
+                warningCard.style.cursor = 'pointer';
+                
+                criticalCard.onclick = () => showRiskBreakdown('critical', {{ risk_analysis.critical_risk_spns }}, 
+                    'Critical issues require immediate attention', [
+                        'Disabled service principals',
+                        'Missing application IDs', 
+                        'Very old SPNs (5+ years)'
+                    ]);
+                
+                warningCard.onclick = () => showRiskBreakdown('warning', {{ risk_analysis.warning_spns }},
+                    'Warning issues should be reviewed and addressed', [
+                        'Missing display names',
+                        'Legacy SPNs (2+ years)',
+                        'Suspicious naming patterns'
+                    ]);
+                
+            {% else %}
+                // Fallback: If no backend data, try to get it via API
+                fetch('/api/dashboard/stats')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById('critical-count').textContent = data.details.critical_risk_spns || 0;
+                            document.getElementById('warning-count').textContent = data.details.warning_spns || 0;
+                            document.getElementById('spn-analyzed').textContent = data.stats.spn_count || 0;
+                            document.getElementById('security-score').textContent = data.stats.security_score || '0%';
+                            
+                            // Update security score card color
+                            const scoreCard = document.querySelector('.summary-card.success');
+                            const score = parseInt(data.stats.security_score.replace('%', ''));
+                            if (score < 60) {
+                                scoreCard.className = 'summary-card critical';
+                            } else if (score < 80) {
+                                scoreCard.className = 'summary-card warning';
+                            } else {
+                                scoreCard.className = 'summary-card success';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to load risk data:', error);
+                        // Fallback to analysis content parsing (legacy method)
+                        const analysisContent = document.querySelector('.section-content')?.textContent?.toLowerCase() || '';
+                        
+                        // Count keywords to estimate severity
+                        const criticalKeywords = ['critical', 'severe', 'high risk', 'vulnerable', 'exposed'];
+                        const warningKeywords = ['warning', 'medium', 'concern', 'review', 'attention'];
+                        
+                        let criticalCount = 0;
+                        let warningCount = 0;
+                        
+                        criticalKeywords.forEach(keyword => {
+                            const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
+                            criticalCount += matches;
+                        });
+                        
+                        warningKeywords.forEach(keyword => {
+                            const matches = (analysisContent.match(new RegExp(keyword, 'g')) || []).length;
+                            warningCount += matches;
+                        });
+
+                        // Update summary cards
+                        document.getElementById('critical-count').textContent = Math.min(criticalCount, 5);
+                        document.getElementById('warning-count').textContent = Math.min(warningCount, 8);
+                        document.getElementById('spn-analyzed').textContent = '50'; // Based on your API limit
+                        
+                        // Calculate security score (lower is better due to issues found)
+                        const totalIssues = criticalCount + warningCount;
+                        const securityScore = Math.max(0, 100 - (totalIssues * 10));
+                        document.getElementById('security-score').textContent = securityScore + '%';
+                        
+                        // Update security score card color based on score
+                        const scoreCard = document.querySelector('.summary-card.success');
+                        if (securityScore < 60) {
+                            scoreCard.className = 'summary-card critical';
+                        } else if (securityScore < 80) {
+                            scoreCard.className = 'summary-card warning';
+                        } else {
+                            scoreCard.className = 'summary-card success';
+                        }
+                    });
+            {% endif %}
+        }
+
+        function showRiskBreakdown(level, count, description, examples) {
+            const levelIcon = level === 'critical' ? '🔴' : '🟡';
+            const levelColor = level === 'critical' ? 'var(--danger-color)' : 'var(--warning-color)';
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: var(--secondary-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 500px;
+                color: var(--primary-text);
+                position: relative;
+            `;
+            
+            content.innerHTML = `
+                <h3 style="color: ${levelColor}; margin-bottom: 1rem;">
+                    ${levelIcon} ${level.toUpperCase()} RISKS
+                </h3>
+                <p style="margin-bottom: 1rem;">
+                    <strong>${count} service principals</strong> have ${level}-level security issues.
+                </p>
+                <p style="margin-bottom: 1rem; color: var(--secondary-text);">
+                    ${description}
+                </p>
+                <div style="margin-bottom: 1rem;">
+                    <strong>Common ${level} issues:</strong>
+                    <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                        ${examples.map(example => `<li>${example}</li>`).join('')}
+                    </ul>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" 
+                        style="background: var(--gradient-accent); color: white; border: none; 
+                               padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;">
+                    Close
+                </button>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+        }
+
+        function exportReport() {
+            if (!analysisData) {
+                alert('No analysis data available to export. Please run an analysis first.');
+                return;
+            }
+
+            const reportContent = `Azure Identity Tracker - Security Analysis Report
+Generated: ${new Date().toISOString()}
+
+${analysisData.analysis}
+`;
+
+            const blob = new Blob([reportContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `azure-identity-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Add smooth scrolling for any anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
